@@ -18,6 +18,6 @@ $logger = new \Appe\Logger();
 //$eryk->getData();
 //$eryk->putData();
 
-$prestahsop = new \Appe\Prestashop(new Curl\Curl, $logger);  
-
-$prestahsop->getData();
+//$prestahsop = new \Appe\Prestashop(new Curl\Curl, $logger);  
+//
+//$prestahsop->getData();
