@@ -1,0 +1,10 @@
+{
+    "require": {
+        "curl/curl": "^1.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Appe\\":"src/Appe"
+        }
+    }
+}
