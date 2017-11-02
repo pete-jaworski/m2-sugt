@@ -1,5 +1,6 @@
 composer.lock
 composer.phar
+.gitignore
 /php
 /vendor
 /nbproject
