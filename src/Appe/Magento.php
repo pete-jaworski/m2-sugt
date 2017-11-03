@@ -19,7 +19,7 @@ class Magento implements \Appe\EcommerceInterface
         $this->curl = $curl;
         $this->logger = $logger;
         $this->curl->setHeader('Content-Type', 'application/json');
-        $this->curl->post('http://gb.e-mossa.eu/index.php/rest/V1/integration/admin/token?username=pete&password=superdupa77');
+        $this->curl->post('');
         $this->bearer = str_replace('"','', $this->curl->response);
         $this->logger->log('Auth token retrieved: '.$this->bearer);        
     }
@@ -32,7 +32,7 @@ class Magento implements \Appe\EcommerceInterface
             $this->curl->setHeader('Content-Type', 'application/json');
             $this->curl->setHeader('Accept', 'application/json');
             $this->curl->setHeader('Authorization', 'Bearer '.$this->bearer);
-            $results = $this->curl->get('http://gb.e-mossa.eu/index.php/rest/V1/orders?searchCriteria[pageSize]=50&searchCriteria[currentPage]=210')->response;
+            $results = $this->curl->get('/rest/V1/orders?searchCriteria[pageSize]=50&searchCriteria[currentPage]=210')->response;
             $this->curl->close();   
             $this->logger->log('Data from Magento retrieved'); 
             return json_decode($results, true);

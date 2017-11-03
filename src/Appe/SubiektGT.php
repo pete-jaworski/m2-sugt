@@ -39,32 +39,35 @@ class SubiektGT implements \Appe\ERPInterface
         
         $this->logger->log("Upload to SubiektGB started");
         if($orders){
-
+            
             foreach($orders as $order){
                 
+                $data = json_decode($order['json'], true);
+
                 $error = false;
                 $zk = $this->subiektInstance->SuDokumentyManager->DodajZK();
-                $zk->NumerOryginalny = $order['orderid'];
+                $zk->NumerOryginalny = $data['NumerOryginalny'];
                 $zk->Rezerwacja = false;
                 
-                if(!$this->subiektInstance->KontrahenciManager->IstniejeWg($order['customer'], 3)){
-                    if(!$this->addKontrahent($order)){
+                if(!$this->subiektInstance->KontrahenciManager->IstniejeWg($data['Kontrahent']['symbol'], 3)){
+                    if(!$this->addKontrahent($data['Kontrahent'])){
                         $error = true;
                     }
                 }
-                $zk->KontrahentId = $order['customer'];                    
+                $zk->KontrahentId = $data['Kontrahent']['symbol'];                    
                 
 
-                foreach(json_decode($order['items'], true) as $item){
-                    if(!$this->subiektInstance->TowaryManager->IstniejeWg($item[0], 2)){
-                        if(!$this->addTowar($item[0], $item[1])){
+                foreach($data['Towary'] as $towar){
+                    if(!$this->subiektInstance->TowaryManager->IstniejeWg($towar['symbol'], 2)){
+                        if(!$this->addTowar($towar)){
                             $error = true;
                         }                   
                     }
-                    $pozycja = $zk->Pozycje->Dodaj($item[0]);
-                    $pozycja->IloscJm = $item[1]['qty_ordered'];                    
+                    $pozycja = $zk->Pozycje->Dodaj($towar['symbol']);
+                    $pozycja->IloscJm = $towar['ilosc'];                    
                 }
                 
+
                 if(!$error){
                     try {
                         $zk->Zapisz();
@@ -72,7 +75,7 @@ class SubiektGT implements \Appe\ERPInterface
                     } catch (\Exception $ex) {
                         $this->logger->log("Added ZK failed: ".$ex->getMessage());
                     } 
-                    if($this->flagAsSorted($order)){
+                    if($this->db->flagAsSorted($data)){
                         $this->logger->log("Database Record flagged as Sorted OK");
                     } else {
                         $this->logger->log("Database Record flagged as Sorted FAILED");
@@ -97,62 +100,55 @@ class SubiektGT implements \Appe\ERPInterface
 
 
 
-    
-    private function flagAsSorted(array $order)
-    {
-        $this->db->connection->query("USE ". \Appe\MSSQL::DB_NAME);
-        $markAsSorted = $this->db->connection->prepare("UPDATE orders set f2 = '".date('Y-m-d H:i:s')."' where id = ".$order['id']);
-        return $markAsSorted->execute();
-    }
+
  
     
 
 
-    private function addTowar($key, array $value)
+    private function addTowar(array $data)
     {
-        try {
-            $towar = $this->subiektInstance->Towary->dodaj(1); 
-            $towar->Aktywny = true;
-            $towar->Symbol = $key;
-            $towar->Nazwa = $this->fixEncoding(substr($value['name'], 0, 49));
-            $towar->Ceny->Element(1)->Brutto  = $value['base_price'] > 0 ? $value['base_price'] : $value['parent_item']['base_price'];
-            $towar->Ceny->Element(2)->Brutto  = $value['base_price'] != 0 ? $value['base_price'] : $value['parent_item']['base_price'];
-            $towar->Zapisz();  
-            $this->logger->log("Added TOWAR: ".$key." ok");
-            return true;
-        } catch (\Exception $ex) {
-            $this->logger->log("Added TOWAR: ".$key." failed: ".$ex->getMessage());
-            return false;            
+        if($data){
+            try {
+                $towar = $this->subiektInstance->Towary->dodaj(1); 
+                $towar->Aktywny                     = $data['aktywny'];
+                $towar->Symbol                      = $data['symbol'];
+                $towar->Nazwa                       = $this->fixEncoding(substr($data['nazwa'], 0, 49));
+                $towar->Ceny->Element(1)->Brutto    = round($data['ceny']['detaliczna']['brutto'], 2);
+                $towar->Ceny->Element(2)->Brutto    = round($data['ceny']['hurtowa']['brutto'], 2);
+                $towar->Zapisz();  
+                $this->logger->log("Added TOWAR: ".$data['symbol']." ok");
+                return true;
+            } catch (\Exception $ex) {
+                $this->logger->log("Added TOWAR: ".$data['symbol']." failed: ".$ex->getMessage());
+                return false;            
+            }
         }
-
   }
     
     
     
     
-    private function addKontrahent(array $order)
+    private function addKontrahent(array $data)
     {
-        $kontrahentId = $order['customer'];
-        $kontrahentData = json_decode($order['json'])->billing_address;
-
-        if($kontrahentData){
+        if($data){
             try {
                 $kontrahent = $this->subiektInstance->Kontrahenci->dodaj();  
-                $kontrahent->Nazwa = $this->fixEncoding(($kontrahentData->firstname.' '.$kontrahentData->lastname));
-                $kontrahent->Symbol = $kontrahentId;
-                $kontrahent->Ulica = $this->fixEncoding($kontrahentData->street[0]);
-                $kontrahent->KodPocztowy = $this->fixEncoding($kontrahentData->postcode);
-                $kontrahent->Miejscowosc = $this->fixEncoding($kontrahentData->city);
-                $kontrahent->AdrDostNazwa = $this->fixEncoding(($kontrahentData->firstname.' '.$kontrahentData->lastname));
-                $kontrahent->AdrDostUlica = $this->fixEncoding($kontrahentData->street[0]);
-                $kontrahent->AdrDostKodPocztowy = $this->fixEncoding($kontrahentData->postcode);
-                $kontrahent->AdrDostMiejscowosc = $this->fixEncoding($kontrahentData->city);
-                $kontrahent->Email = $this->fixEncoding($kontrahentData->email);
+                $kontrahent->Nazwa              = $this->fixEncoding($data['nazwa']);
+                $kontrahent->Symbol             = $data['symbol'];
+                $kontrahent->Ulica              = $this->fixEncoding($data['adresy']['siedziba']['ulica']);
+                $kontrahent->KodPocztowy        = $this->fixEncoding($data['adresy']['siedziba']['kod']);
+                $kontrahent->Miejscowosc        = $this->fixEncoding($data['adresy']['siedziba']['miejscowosc']);
+                $kontrahent->Email              = $this->fixEncoding($data['email']);
+                $kontrahent->AdrDostNazwa       = $this->fixEncoding($data['adresy']['dostawa']['nazwa']);
+                $kontrahent->AdrDostUlica       = $this->fixEncoding($data['adresy']['dostawa']['ulica']);
+                $kontrahent->AdrDostKodPocztowy = $this->fixEncoding($data['adresy']['dostawa']['kod']);
+                $kontrahent->AdrDostMiejscowosc = $this->fixEncoding($data['adresy']['dostawa']['miejscowosc']);
+                
                 $kontrahent->Zapisz();          
-                $this->logger->log("Added KONTRAHENT: ".$kontrahentId." ok");
+                $this->logger->log("Added KONTRAHENT: ".$data['symbol']." ok");
                 return true;
             } catch (\Exception $ex) {
-                $this->logger->log("Added KONTRAHENT: ".$kontrahentId." failed: ".$ex->getMessage());
+                $this->logger->log("Added KONTRAHENT: ".$data['symbol']." failed: ".$ex->getMessage());
                 return false;
             }            
         }    
@@ -163,7 +159,7 @@ class SubiektGT implements \Appe\ERPInterface
 
     private function fixEncoding($string)
     {
-        return iconv("UTF-8", "ISO-8859-1", $string); 
+        return iconv("UTF-8", "ISO-8859-1//TRANSLIT//IGNORE", $string); 
     }
     
  

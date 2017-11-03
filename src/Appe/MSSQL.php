@@ -7,9 +7,7 @@ class MSSQL implements \Appe\DatabaseInterface
     const DB_USERNAME = '';
     const DB_PASSWORD = '';
     const DB_NAME = 'SubiektGT_Magento';
-    const TB_NAME = 'orders';
-    const CUSTOMER_PREFIX = 'KON-MA-';
-    const PRODUCT_PREFIX = 'PROD-MA-';
+    const TB_NAME = 'orders_2';
     const DB_CONNECTION_STRING = 'sqlsrv:Server='.self::DB_SERVER.';Database='.self::DB_NAME;    
 
     public $connection;
@@ -26,6 +24,7 @@ class MSSQL implements \Appe\DatabaseInterface
             $this->createDB();
         } catch (\PDOException $e) {
             $this->logger->log('Connection failed: ' . $e->getMessage());
+            die();
         }        
     }
 
@@ -40,13 +39,11 @@ class MSSQL implements \Appe\DatabaseInterface
         $orders = array();
             
             try {
-                
-                $query = $this->connection->prepare("SELECT * FROM ".self::TB_NAME." WHERE f2 = ''");
+                $query = $this->connection->prepare("SELECT * FROM ".self::TB_NAME." WHERE f2 = '';");
                 $query->execute();      
                 $orders = $query->fetchAll();   
                 $this->logger->log('Database data retrieved');   
                 return $orders;
-                
             } catch (\Exception $ex) {
                 $this->logger->log('Could not get data from Database '.$ex->getMessage());  
                 return false;
@@ -67,36 +64,28 @@ class MSSQL implements \Appe\DatabaseInterface
         if(!is_array($orders) || !$orders){
             throw new Exception('That is not an Array');
         }
+        
 
         $this->connection->query("USE ".self::DB_NAME);
         
-        foreach($orders['items'] as $order){
-            $products = array();
-            foreach($order['items'] as $item){
-                if($item['product_type'] == 'simple'){
-                    $products[] = array(self::PRODUCT_PREFIX.$item['product_id'], $item);                    
-                }
-            }
+            foreach($orders as $order){
+                try {
+                    $query = $this->connection->prepare("INSERT INTO ".self::TB_NAME." VALUES 
+                        ('".date('Y-m-d H:i:s')."',
+                        '".$channel."',
+                        '".$order['NumerOryginalny']."',
+                        '".json_encode($order, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG)."',
+                        '',    
+                        '',
+                        '')");
 
-        try {
-            $query = $this->connection->prepare("INSERT INTO ".self::TB_NAME." VALUES 
-                ('".date('Y-m-d H:i:s')."',
-                '".self::CUSTOMER_PREFIX.$order['billing_address']['entity_id']."',
-                '".json_encode($products)."',                        
-                '".$order['increment_id']."',
-                '". json_encode($order, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG)."',
-                '".$channel."',    
-                '',
-                '')");
-                    
-            $query->execute();                                
-            $this->logger->log('Order #'.$order['increment_id']." uploaded");                    
-                    
-        } catch (\Exception $ex) {
-            $errors++;
-            $this->logger->log('Order #'.$order['increment_id']." failed: ".$ex->getMessage());   
-        }
-        
+                    $query->execute();                                
+                    $this->logger->log('Order #'.$order['NumerOryginalny']." saved");                    
+
+                } catch (\Exception $ex) {
+                    $errors++;
+                    $this->logger->log('Order #'.$order['NumerOryginalny']." failed: ".$ex->getMessage());   
+                }
         }  
         return !$errors;
     }
@@ -104,7 +93,13 @@ class MSSQL implements \Appe\DatabaseInterface
 
     
   
-
+    
+    public function flagAsSorted(array $order)
+    {
+        $this->connection->query("USE ".self::DB_NAME);
+        $markAsSorted = $this->connection->prepare("UPDATE ".self::TB_NAME." set f2 = '".date('Y-m-d H:i:s')."' where id = ".$order['NumerOryginalny']);
+        return $markAsSorted->execute();
+    }
 
 
 
@@ -132,8 +127,7 @@ class MSSQL implements \Appe\DatabaseInterface
                 $this->connection->query("CREATE TABLE ".self::TB_NAME." (
                                             id INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
                                             date DATETIME NOT NULL,
-                                            customer TEXT NOT NULL,
-                                            items TEXT NOT NULL,
+                                            channel VARCHAR(255),
                                             orderid VARCHAR(255) NOT NULL,
                                             json TEXT NOT NULL,
                                             f1 VARCHAR(255),

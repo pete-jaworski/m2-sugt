@@ -28,10 +28,8 @@ class Controller
     public function getData()
     {
         $results = $this->ecommerce->getData();
-        
+  
         if($results){
-            $this->logger->log('Integration initialized');        
-            
             if($this->db->write($results, $this->ecommerce->channel)){
                 $this->logger->log('getData completed with no Errors');        
             } else {
@@ -42,7 +40,7 @@ class Controller
     }
 
     
-    public function putData()
+    public function uploadData()
     {
         if($this->erp->upload()){
             $this->logger->log('putData completed');        
