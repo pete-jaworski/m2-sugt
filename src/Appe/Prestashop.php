@@ -11,7 +11,7 @@ class Prestashop implements \Appe\EcommerceInterface
     
     const CUSTOMER_PREFIX = 'KON-PRE-';
     const PRODUCT_PREFIX = 'PROD-PRE-';
-    const ACCESS_TOKEN = 'DC7WX8US51AILF3K55AATQCMBWVC879Z';
+    const ACCESS_TOKEN = '33DC7WX8US51AILF3K55AATQCMBWVC879Z44';
     public $channel = 'Prestashop';
     private $curl;
     private $logger;
